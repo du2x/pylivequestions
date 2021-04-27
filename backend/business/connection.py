@@ -13,8 +13,8 @@ def create_connection(data):
     return wid
 
 
-def delete_connection(room_id, connection_id):
-    res = repo.delete(room_id, connection_id)
+def delete_connection(connection_id):
+    res = repo.delete(connection_id)
     return res
 
 

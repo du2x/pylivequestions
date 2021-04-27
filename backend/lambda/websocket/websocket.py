@@ -12,7 +12,5 @@ def connection_handler(event, context):
 
 
 def disconnection_handler(event, context):
-    param = event.get('queryStringParameters', {'data': 'default,guest'}).get('data')
-    param_data = param.split(',')
-    delete_connection(param_data[0],event['requestContext']['connectionId'])
+    delete_connection(event['requestContext']['connectionId'])
     return {'statusCode': 200}
