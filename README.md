@@ -50,7 +50,7 @@ First, let's talk about persistence.
 Dynamodb Design
 -----
 
-This app has 4 strong entities: user; room; question and attempts. The user entity is not a concern, because its management was delegated to the Congnite User Pool service.
+This app has 4 strong entities: user; room; question and attempts. The user entity is not a concern, because its management was delegated to the **Cognito** User Pool service.
 
 So, there are rooms, questions and attempts to be stored. We are using dynamodb, a NoSQL database. So we have to design it's Keys (PARTITION KEY and SORT KEY) by analising data access patterns. By doing, I got the following data queries:
 
