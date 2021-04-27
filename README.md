@@ -109,7 +109,7 @@ The tracing was enabled by using aws-xray-sdk python package on dynamodb stream 
 
 Layered architecture
 ------
-I tryed to separate the layers of business and domain, of the persistense logic and other presentation. I also organized the many lambda by the event that triggers them.
+I tried to separate the layers of business and domain, of the persistense logic and other presentation. I also organized the many lambda by the event that triggers them.
 
 Issues
 ----------
