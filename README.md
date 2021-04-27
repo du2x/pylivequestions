@@ -70,7 +70,7 @@ Thus, I can query all rooms using only PK, and query room by room id.
 Question: (PK=Question, SK=Question#[questionuiid]). Same as Room.
 But about question, there is a gotcha.  The same question can be in many rooms. So, I created the concept of QuestionInRoom: When a Question is picket for a Room, it will be copied into a QuentionInRoom concept, which will be stored with the following Keys: 
 
-QuestionInRoom: (PK=QUESTION#ROOM#<roomName>, SK=pickedAt) So, I can query the active question on a room by using the roomName of PK and getting the higher "pickedAt" QuestionInRoom - the active question will be always the last picked.
+QuestionInRoom: (PK=QUESTION#ROOM#[roomName], SK=pickedAt) So, I can query the active question on a room by using the roomName of PK and getting the higher "pickedAt" QuestionInRoom - the active question will be always the last picked.
 
 Attempts: (PK: Attempt#Question#[questionuuid], SK:Room#[roomid]) Thus, I can query by room and questionuuid, or just by questionuuid.
 
