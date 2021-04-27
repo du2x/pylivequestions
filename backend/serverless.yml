@@ -1,0 +1,230 @@
+org: du2xx
+app: pylivequestions
+service: pylivequestions
+
+frameworkVersion: '2'
+
+provider:
+  name: aws
+  runtime: python3.8
+  tracing:
+    lambda: true
+    apiGateway: true
+  iamRoleStatements:
+      - Effect: 'Allow'
+        Action:
+          - 'xray:PutTraceSegments'
+          - 'xray:PutTelemetryRecords'
+        Resource:
+          - '*'
+  lambdaHashingVersion: '20201221'
+  stage: dev
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - Fn::GetAtt: [ AppTable, Arn ]
+
+
+  environment:
+    APP_TABLE: pylivequestions-${self:provider.stage}
+
+  httpApi:
+    cors:
+      allowedOrigins:
+        - http://localhost
+        - http://localhost:3000
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+      allowedMethods:
+        - GET
+        - POST
+        - OPTIONS
+      allowCredentials: true
+      exposedResponseHeaders:
+        - Special-Response-Header
+      maxAge: 6000 # In seconds
+    authorizers:
+      serviceAuthorizer:
+        identitySource: $request.header.Authorization
+        issuerUrl:
+          Fn::Join:
+          - ''
+          - - 'https://cognito-idp.'
+            - '${opt:region, self:provider.region}'
+            - '.amazonaws.com/'
+            - Ref: serviceUserPool
+        audience:
+          - Ref: serviceUserPoolClient
+
+functions:
+  all_rooms:
+    handler: lambda/httpApi/all_rooms.handler
+    events:
+      - httpApi:
+          path: '/${self:provider.stage}/rooms'
+          authorizer: serviceAuthorizer
+          method: GET
+
+  new_room:
+    handler: lambda/httpApi/new_room.handler
+    events:
+      - httpApi:
+          path: '/${self:provider.stage}/rooms'
+          authorizer: serviceAuthorizer
+          method: POST
+
+  all_questions:
+    handler: lambda/httpApi/all_questions.handler
+    events:
+      - httpApi:
+          path: '/${self:provider.stage}/questions'
+          authorizer: serviceAuthorizer
+          method: GET
+
+  new_question:
+    handler: lambda/httpApi/new_question.handler
+    events:
+      - httpApi:
+          path: '/${self:provider.stage}/questions'
+          authorizer: serviceAuthorizer
+          method: POST
+
+  room_active_question:
+    handler: lambda/httpApi/room_active_question.handler
+    events:
+      - httpApi:
+          path: '/${self:provider.stage}/room/{proxy+}'
+          authorizer: serviceAuthorizer
+          method: GET
+
+  room_action:
+    handler: lambda/httpApi/room_action.handler
+    events:
+      - httpApi:
+          path: '/${self:provider.stage}/room/{proxy+}'
+          authorizer: serviceAuthorizer
+          method: POST
+
+  new_attempt:
+    handler: lambda/httpApi/new_attempt.handler
+    events:
+      - httpApi:
+          path: '/${self:provider.stage}/attempts'
+          authorizer: serviceAuthorizer
+          method: POST
+
+  room_attempts:
+    handler: lambda/httpApi/attempts_against_question_and_room.handler
+    events:
+      - httpApi:
+          path: '/${self:provider.stage}/room_attempts'
+          authorizer: serviceAuthorizer
+          method: POST
+
+  ConnectHandler:
+    handler: lambda/websocket/websocket.connection_handler
+    events:
+      - websocket:
+          route: $connect
+
+  DisconnectHandler:
+    handler: lambda/websocket/websocket.disconnection_handler
+    events:
+      - websocket:
+          route: $disconnect
+
+  NotifyAttempts:
+    handler: lambda/dynamodb/dynamodb_stream.handler
+    events:
+      - stream:
+          type: dynamodb
+          arn: !GetAtt AppTable.StreamArn
+
+plugins:
+  - serverless-python-requirements
+  - serverless-plugin-tracing
+resources:
+  Resources:
+    HttpApi:
+      DependsOn: serviceUserPool
+    serviceUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: service-user-pool-${opt:stage, self:provider.stage}
+        UsernameAttributes:
+          - email
+        AutoVerifiedAttributes:
+          - email
+    serviceUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: service-user-pool-client-${opt:stage, self:provider.stage}
+        AllowedOAuthFlows:
+          - implicit
+        AllowedOAuthFlowsUserPoolClient: true
+        AllowedOAuthScopes:
+          - phone
+          - email
+          - openid
+          - profile
+          - aws.cognito.signin.user.admin
+        UserPoolId:
+          Ref: serviceUserPool
+        CallbackURLs:
+          - https://localhost:3000
+        ExplicitAuthFlows:
+          - ALLOW_USER_SRP_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+        GenerateSecret: false
+        SupportedIdentityProviders:
+          - COGNITO
+    serviceUserPoolDomain:
+      Type: AWS::Cognito::UserPoolDomain
+      Properties:
+        UserPoolId:
+          Ref: serviceUserPool
+        Domain: service-user-pool-domain-${opt:stage, self:provider.stage}-wyvern
+    AppTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: SK
+            AttributeType: S
+          - AttributeName: connection_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: PK
+            KeyType: HASH
+          - AttributeName: SK
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        StreamSpecification:
+          StreamViewType: NEW_IMAGE
+        TableName: ${self:provider.environment.APP_TABLE}
+        GlobalSecondaryIndexes:
+          - IndexName: connection_id
+            KeySchema:
+              - AttributeName: connection_id
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+
+
+
